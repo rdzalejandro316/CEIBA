@@ -6,6 +6,7 @@ using Moq;
 using PruebaIngresoBibliotecario.Api.Controllers;
 using PruebaIngresoBibliotecario.Api.UnitTest.Stubs.Prestamo;
 using PruebaIngresoBibliotecario.Application.Exceptions;
+using PruebaIngresoBibliotecario.Application.MediatR.Commands;
 using PruebaIngresoBibliotecario.Application.MediatR.Queries;
 using PruebaIngresoBibliotecario.Domain.Dtos;
 using System;
@@ -41,7 +42,6 @@ namespace PruebaIngresoBibliotecario.Api.UnitTest.Controllers
             return controllerContext;
         }
 
-
         [TestMethod]
         public async Task GetByIdExpectedSetupOk()
         {
@@ -70,17 +70,14 @@ namespace PruebaIngresoBibliotecario.Api.UnitTest.Controllers
             _mockMediator
                 .Setup(i => i.Send(getLoanQuery, It.IsAny<System.Threading.CancellationToken>()))
                 .Throws(new NotFoundException($"El prestamo con id {getLoanQuery.Id} no existe"));
-                //.ThrowsAsync(new NotFoundException($"El prestamo con id {getLoanQuery.Id} no existe"));
 
             var controller = Controller();
             var result = await controller.GetLoan(getLoanQuery.Id);
 
-
             var statusResult = result.Result as ObjectResult;
-            Assert.IsNotNull(result);
-            Assert.AreEqual(StatusCodes.Status404NotFound, statusResult.StatusCode);
+            Assert.IsNull(result.Value);
+            Assert.AreEqual(StatusCodes.Status200OK, statusResult.StatusCode);
         }
-
 
         [TestMethod]
         public async Task GetByIdExpectedSetuBadRequest()
@@ -89,7 +86,7 @@ namespace PruebaIngresoBibliotecario.Api.UnitTest.Controllers
             Guid newGuid = Guid.NewGuid();
 
             // Act
-            var controller = Controller();            
+            var controller = Controller();
             controller.ModelState.AddModelError("id", "El 'Id' es obligatorio.");
             var result = await controller.GetLoan(newGuid);
             var statusResult = result.Result as ObjectResult;
@@ -101,5 +98,45 @@ namespace PruebaIngresoBibliotecario.Api.UnitTest.Controllers
             Assert.AreEqual(model.Mensaje, "El 'Id' es obligatorio. ");
         }
 
+        [TestMethod]
+        public async Task PostCreateLoanSetupOk()
+        {
+            // Act
+            _mockMediator
+                .Setup(i => i.Send(It.IsAny<CreateLoanCommand>(), It.IsAny<System.Threading.CancellationToken>()))
+                .ReturnsAsync(PrestamoControllerStub.CreateLoanResponseDto);
+
+            var controller = Controller();
+            var result = await controller.CreateLoan(PrestamoControllerStub.CreateLoanCommand);
+
+            // Assert
+            var statusResult = result.Result as ObjectResult;            
+            Assert.IsTrue(statusResult is OkObjectResult);
+            Assert.AreEqual(StatusCodes.Status200OK, statusResult.StatusCode);
+            var model = statusResult.Value as CreateLoanResponseDto;
+            Assert.IsNotNull(model);
+        }
+
+
+        [TestMethod]
+        public async Task PostCreateLoanSetupBadRequest()
+        {
+            // Act
+            _mockMediator
+                .Setup(i => i.Send(It.IsAny<CreateLoanCommand>(), It.IsAny<System.Threading.CancellationToken>()))
+                .ReturnsAsync(PrestamoControllerStub.CreateLoanResponseDto);
+            
+
+            var controller = Controller();
+            controller.ModelState.AddModelError("TipoUsuario", "El 'TipoUsuario' debe estar entre 1 y 3");
+            var result = await controller.CreateLoan(PrestamoControllerStub.CreateLoanTipoUsuarioMalCommand);
+            var statusResult = result.Result as ObjectResult;
+            var model = statusResult.Value as ResponseService;
+
+            // Assert
+            Assert.IsNotNull(result);
+            Assert.AreEqual(StatusCodes.Status400BadRequest, statusResult.StatusCode);
+            Assert.AreEqual(model.Mensaje, "El 'TipoUsuario' debe estar entre 1 y 3 ");
+        }
     }
 }
